@@ -1,0 +1,20 @@
+# Eureka Service Registry (Spring Cloud Netflix Eureka Server)
+# Discovery server for the microservices (userservice, activityservice, ...).
+# NOTE: there MUST be a space after every colon in YAML — `key: value`,
+# otherwise the value is parsed as a plain string and the setting is ignored.
+
+server:
+  port: 8761
+
+spring:
+  application:
+    name: eureka
+
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    # Standalone registry: the server must NOT register with itself and
+    # does NOT need to fetch the registry from any peer node.
+    register-with-eureka: false
+    fetch-registry: false

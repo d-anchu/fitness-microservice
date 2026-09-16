@@ -1,0 +1,28 @@
+package com.fitness.aiservice.controller;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.time.LocalDateTime;
+import java.util.Map;
+
+/**
+ * Converts any unhandled exception into a consistent JSON error response
+ * instead of leaking Spring's default error handling.
+ */
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleGeneric(Exception ex) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of(
+                        "timestamp", LocalDateTime.now().toString(),
+                        "status", HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                        "error", HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),
+                        "message", ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage()
+                ));
+    }
+}

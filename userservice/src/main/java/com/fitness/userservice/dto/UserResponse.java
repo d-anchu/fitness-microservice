@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 public class UserResponse {
 
     private String id;
-
+    private String keycloakId;
 
     private String email;
 

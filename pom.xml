@@ -13,8 +13,10 @@
 
 	<modules>
 		<module>eureka</module>
+		<module>configserverc/configserverc</module>
 		<module>userservice</module>
 		<module>activityservice</module>
 		<module>aiservice</module>
+		<module>gateway/gateway</module>
 	</modules>
 </project>

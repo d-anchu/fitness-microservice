@@ -1,7 +1,8 @@
-server:
-  port: 8083
-
 spring:
+  # `spring.application.name` MUST be declared locally: it is the key the Config
+  # Server lookup uses (http://localhost:8888/<name>/default). Without it the
+  # service would fetch `application/default`, never load the centralised
+  # `ai-service.yml`, and Eureka would register it as UNKNOWN.
   application:
     name: ai-service
   config:
@@ -11,40 +12,11 @@ spring:
     # starts (failing later with a clear placeholder error) if no .env exists.
     #   - .env     -> used when the working directory is the project root
     #   - ../.env  -> used when the working directory is the aiservice folder
+    #
+    # The Config Server is listed FIRST on purpose: later entries in this list
+    # win, so a local .env secret always overrides a centralised default.
+    # Central config: configserverc/configserverc/src/main/resources/config/ai-service.yml
     import:
+      - optional:configserver:http://localhost:8888
       - optional:file:.env[.properties]
       - optional:file:../.env[.properties]
-  data:
-    mongodb:
-      uri: mongodb://localhost:27017/fitnessrecommendation
-      database: fitnessrecommendation
-  rabbitmq:
-    host: localhost
-    port: 5672
-    username: guest
-    password: guest
-
-
-eureka:
-  client:
-    serviceUrl:
-      defaultZone: http://localhost:8761/eureka/
-
-
-rabbitmq:
-  exchange:
-    name: fitness.exchange
-  queue:
-    name: activity.queue
-  routing:
-    key: activity.tracking
-
-# Groq uses OpenAI-compatible chat completions:
-#   POST {groq.api.url} with header "Authorization: Bearer <key>"
-# Override via env vars when deploying: GROQ_API_URL, GROQ_API_KEY and GROQ_MODEL
-groq:
-  api:
-    url: ${GROQ_API_URL:https://api.groq.com/openai/v1/chat/completions}
-    key: ${GROQ_API_KEY}
-    # llama-3.3-70b-versatile is not enabled on every Groq account; gpt-oss-120b is available.
-    model: ${GROQ_MODEL:openai/gpt-oss-120b}

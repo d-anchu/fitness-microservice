@@ -33,6 +33,21 @@
 			<artifactId>postgresql</artifactId>
 			<scope>runtime</scope>
 		</dependency>
+
+		<dependency>
+			<!-- Spring Cloud Config client. This module does not import the
+			     spring-cloud-dependencies BOM (unlike aiservice/eureka/configserverc),
+			     so an explicit <version> is required. Without it Maven cannot even
+			     read the project: "'dependencies.dependency.version' ... is missing".
+			     Version 5.0.5 matches the config-client entry below and
+			     spring-cloud-config-dependencies:5.0.5.
+			     NOTE: this starter already CONTAINS spring-cloud-config-client, so
+			     declaring both is redundant - keep only one of the two. -->
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-config</artifactId>
+			<version>5.0.5</version>
+		</dependency>
+
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
@@ -51,6 +66,13 @@
 		</dependency>
 
 		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-config-client</artifactId>
+			<version>5.0.5</version>
+			<scope>compile</scope>
+		</dependency>
+
+		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-validation-test</artifactId>
 			<scope>test</scope>
@@ -60,6 +82,10 @@
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+
+
+
 	</dependencies>
 
 	<build>

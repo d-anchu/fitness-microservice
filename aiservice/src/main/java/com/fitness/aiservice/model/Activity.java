@@ -17,7 +17,7 @@ public class Activity {
     @Id
     private String id;
     private String userId;
-    private String type;
+    private ActivityType type;  // Now using the enum
     private Integer duration;
     private Integer caloriesBurned;
     private Double distance;
@@ -32,5 +32,11 @@ public class Activity {
 
 
     private LocalDateTime updatedAt;
+    
+    // Helper method to get type as String
+    public String getTypeAsString() {
+        if (type == null) return "UNKNOWN";
+        return type.toString();
+    }
 
 }

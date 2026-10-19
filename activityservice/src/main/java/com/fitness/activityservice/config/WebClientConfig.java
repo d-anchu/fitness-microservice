@@ -11,7 +11,6 @@ public class WebClientConfig
 
     @Bean
     @LoadBalanced
-
    public WebClient.Builder webClientBuilder()
    {
        return WebClient.builder();
@@ -21,19 +20,7 @@ public class WebClientConfig
     public WebClient userServiceWebClient(WebClient.Builder webClientBuilder)
     {
         return webClientBuilder
-                .baseUrl("http://USER-SERVICE")
+                .baseUrl("http://USER-SERVICE")  // Eureka service name
                 .build();
     }
-
-
-
-
-
-
-
-
-
-
-
-
 }

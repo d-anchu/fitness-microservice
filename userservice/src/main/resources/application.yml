@@ -1,19 +1,14 @@
-server:
-  port: 8081
-
+# Bootstrap config for the user-service.
+# NOTE: every key must start at column 0 here (root mapping) -- an indented
+# root key is silently parsed as a nested mapping under an empty key.
+#
+# The real settings (server.port, datasource, jpa, eureka.client.serviceUrl)
+# live in the Config Server: configserverc/configserverc/src/main/resources/config/user-service.yml
+# -> start the Config Server on port 8888 BEFORE this service, otherwise the
+#    datasource properties are missing and the application fails to boot.
 spring:
   application:
     name: user-service
-  datasource:
-    url: jdbc:postgresql://localhost:5433/fitness_user_id
-    username: postgres
-    password: dhruv
-  jpa:
-    hibernate:
-      ddl-auto: update
-      database-platform: org.hibernate.dialect.PostgreSQLDialect
+  config:
+    import: optional:configserver:http://localhost:8888
 
-eureka:
-  client:
-    serviceUrl:
-      defaultZone: http://localhost:8761/eureka/

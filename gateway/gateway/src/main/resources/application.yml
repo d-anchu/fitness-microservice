@@ -1,0 +1,17 @@
+# API Gateway (Spring Cloud Gateway 5.x, servlet / WebMVC server).
+#
+# NOTE: there MUST be a space after every colon: `name: api-gateway`.
+# `name:api-gateway` (no space) is parsed as ONE scalar key with a null value,
+# so spring.application.name stays unset and Eureka registers the gateway as
+# UNKNOWN.
+#
+# NOTE: the route prefix for the 5.x WebMVC server is
+# `spring.cloud.gateway.server.webmvc.routes`. The old `spring.cloud.gateway.routes`
+# key is only read by the 4.x gateway; with 5.0.3 it is ignored and the gateway
+# would start with no routes at all.
+spring:
+  application:
+    name: api-gateway
+  config:
+    import: optional:configserver:http://localhost:8888
+

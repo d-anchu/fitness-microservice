@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>4.1.1</version>
+		<relativePath/> <!-- lookup parent from repository -->
+	</parent>
+	<groupId>com.fitness</groupId>
+	<artifactId>gateway</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name/>
+	<description/>
+	<url/>
+	<licenses>
+		<license/>
+	</licenses>
+	<developers>
+		<developer/>
+	</developers>
+	<scm>
+		<connection/>
+		<developerConnection/>
+		<tag/>
+		<url/>
+	</scm>
+	<properties>
+		<java.version>21</java.version>
+		<spring-cloud.version>2025.1.3</spring-cloud.version>
+	</properties>
+	<dependencies>
+		<dependency>
+			<!-- Spring Cloud Gateway 5.x split the old starter in two:
+			     - spring-cloud-starter-gateway-server-webmvc   (servlet / Tomcat, used here)
+			     - spring-cloud-starter-gateway-server-webflux  (reactive / Netty)
+			     The pre-5.0 artifact `spring-cloud-starter-gateway` is NOT compatible with
+			     Spring Boot 4: it references classes that no longer exist, e.g.
+			     org.springframework.boot.autoconfigure.web.embedded.NettyWebServerFactoryCustomizer,
+			     so the application context fails to start.
+			     Version is managed by the spring-cloud-dependencies BOM above (2025.1.3). -->
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-gateway-server-webmvc</artifactId>
+		</dependency>
+
+		<dependency>
+			<!-- Spring Cloud Config client: lets this module read its routes/port from
+			     configserverc (<name>/default, see application.yml -> spring.config.import).
+			     No <version> needed: this module imports the spring-cloud-dependencies
+			     BOM above, and that BOM manages spring-cloud-starter-config (5.0.5). -->
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-config</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+		</dependency>
+
+		<dependency>
+			<!-- WebClient (org.springframework.web.reactive.function.client) lives in spring-webflux.
+			     It is NOT available transitively: spring-cloud-loadbalancer (pulled in by
+			     spring-cloud-starter-gateway-server-webmvc) declares spring-boot-starter-webflux as
+			     <optional>true</optional>, and optional dependencies are never inherited.
+			     Only spring-webflux is added here - NOT spring-boot-starter-webflux - so the servlet
+			     Tomcat stack stays the active web server (Boot picks SERVLET whenever
+			     spring-web.servlet.DispatcherServlet is on the classpath) and no Netty server is pulled in.
+			     Same pattern as activityservice/pom.xml. Version is managed by spring-boot-starter-parent. -->
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-webflux</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
+		</dependency>
+
+
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<scope>provided</scope>
+		</dependency>
+	</dependencies>
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-dependencies</artifactId>
+				<version>${spring-cloud.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<excludes>
+						<exclude>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+						</exclude>
+					</excludes>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+							<version>${lombok.version}</version>
+						</path>
+					</annotationProcessorPaths>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+
+</project>

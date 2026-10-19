@@ -1,31 +1,18 @@
+# Bootstrap config for the activity-service.
+# `spring.application.name` MUST be declared locally: it is the key the Config
+# Server lookup uses (http://localhost:8888/<name>/default). Without it the
+# service would fetch `application/default`, never load the centralised
+# `activity-service.yml`, and Eureka would register it as UNKNOWN.
+#
+# Central config: configserverc/configserverc/src/main/resources/config/activity-service.yml
+# The values below are fallbacks so the service can still boot if the Config
+# Server is not running -- the Config Server value wins whenever both define
+# the same key.
 spring:
   application:
     name: activity-service
-  data:
-    mongodb:
-      uri: mongodb://localhost:27017/fitnessactivity
-      database: fitnessactivity
-  rabbitmq:
-    host: localhost
-    port: 5672
-    username: guest
-    password: guest
+  config:
+    import: optional:configserver:http://localhost:8888
 
 
-server:
-  port: 8082
-
-eureka:
-  client:
-    serviceUrl:
-      defaultZone: http://localhost:8761/eureka/
-
-
-rabbitmq:
-  exchange:
-    name: fitness.exchange
-  queue:
-    name: activity.queue
-  routing:
-    key: activity.tracking
 

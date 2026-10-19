@@ -1,0 +1,75 @@
+# Centralised config for the API Gateway.
+#
+# IMPORTANT: this file name MUST equal the client's `spring.application.name`.
+# The Config Server picks the file by the name the client asks for
+# (http://localhost:8888/<name>/default), so `api-gateway` needs THIS file to be
+# called `api-gateway.yml`. A file named `gateway.yml` is never served, because
+# no client asks for the environment "gateway".
+#
+# NOTE: there MUST be a space after every colon: `name: api-gateway`.
+# `name:api-gateway` (no space) is parsed as ONE scalar key with a null value.
+#
+# NOTE: the route prefix for the 5.x WebMVC gateway is
+# `spring.cloud.gateway.server.webmvc.routes`. The old `spring.cloud.gateway.routes`
+# key is only read by the 4.x gateway; with 5.0.3 it is ignored and the gateway
+# would start with no routes at all.
+spring:
+  application:
+    name: api-gateway
+
+  security:
+    oauth2:
+      # NOTE: the resource-server properties live under
+      # `spring.security.oauth2.resourceserver`, NOT under
+      # `spring.security.oauth2.client.resourceserver`.
+      # `spring.security.oauth2.client.*` is bound by OAuth2ClientProperties, which only
+      # knows `provider` and `registration`; an extra `resourceserver` segment there is
+      # silently ignored (relaxed binding ignores unknown keys), so no JwtDecoder would
+      # ever be built and `oauth2ResourceServer(jwt(...))` would fail at startup.
+      # Verified against Spring Boot 4.1.1:
+      #   OAuth2ResourceServerProperties -> @ConfigurationProperties("spring.security.oauth2.resourceserver")
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://127.0.0.1:8180/realms/fitness-oauth2/protocol/openid-connect/certs
+
+  cloud:
+    gateway:
+      # CORS Configuration: Allow frontend (localhost:5173) to access the API Gateway
+      # Without this, browser blocks requests from frontend to backend (different origins)
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            # Allow frontend origin
+            allowedOrigins: "http://localhost:5173"
+            # Allow all HTTP methods (GET, POST, PUT, DELETE, OPTIONS)
+            allowedMethods: "*"
+            # Allow all headers including Authorization and X-User-Id
+            allowedHeaders: "*"
+            # Allow credentials (cookies, authorization headers)
+            allowCredentials: true
+      server:
+        webmvc:
+          routes:
+            # Paths are forwarded unchanged: every service already exposes /api/<resource>
+            # (userservice /api/users, activityservice /api/activities, aiservice /api/recommendations),
+            # so no StripPrefix filter is required.
+            - id: user-service
+              uri: lb://USER-SERVICE
+              predicates:
+                - Path=/api/users/**
+            - id: activity-service
+              uri: lb://ACTIVITY-SERVICE
+              predicates:
+                - Path=/api/activities/**
+            - id: ai-service
+              uri: lb://AI-SERVICE
+              predicates:
+                - Path=/api/recommendations/**
+
+server:
+  port: 8080
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/

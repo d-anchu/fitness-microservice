@@ -658,24 +658,246 @@ fitness-microservice/
 
 ---
 
-##  Engineering Concepts Demonstrated
+## 🧠 Design Decisions
 
-This project provides practical implementation experience with:
+### 1. Why RabbitMQ instead of synchronous AI processing?
 
-- Distributed systems and microservices architecture.
-- Service discovery and registration.
-- API Gateway pattern.
-- OAuth 2.0 and PKCE authentication.
-- JWT validation and resource server security.
-- Synchronous inter-service communication.
-- Asynchronous event-driven architecture.
-- Message brokers and RabbitMQ.
-- Polyglot persistence.
-- Centralized configuration management.
-- Maven multi-module builds.
-- GitHub Actions CI/CD automation.
+AI recommendation generation can take considerably longer than normal database operations.
+
+If the Activity Service directly waits for the AI Service to finish generating a recommendation, the activity-recording request becomes dependent on AI processing time.
+
+To avoid this tight coupling, RabbitMQ is used for asynchronous communication.
+
+**Workflow:**
+
+1. The Activity Service receives a fitness activity.
+2. The activity is persisted in MongoDB.
+3. An activity event is published to RabbitMQ.
+4. The Activity Service can return its response without waiting for AI processing to finish.
+5. The AI Service independently consumes the event and generates recommendations.
+
+This approach provides:
+
+- Loose coupling between Activity and AI services.
+- Independent processing of AI-related workloads.
+- Reduced dependency on synchronous communication.
+- Better support for handling increasing workloads.
+
+### 2. Why Eureka and Spring Cloud Config?
+
+**Eureka – Service Discovery**
+
+In a distributed system, microservices need to communicate with one another without depending on hardcoded IP addresses.
+
+Eureka provides a central service registry where individual services register themselves.
+
+For example:
+
+- User Service registers as `USER-SERVICE`.
+- Activity Service registers as `ACTIVITY-SERVICE`.
+- AI Service registers as `AI-SERVICE`.
+
+Other services can discover these registered instances using their service names.
+
+This makes service communication more flexible when service instances or their network locations change.
+
+**Spring Cloud Config – Centralized Configuration**
+
+Maintaining separate configuration properties across multiple microservices can become difficult as the application grows.
+
+Spring Cloud Config provides a centralized configuration mechanism.
+
+Instead of independently managing configuration files in every service, services retrieve their configuration from the Config Server.
+
+This simplifies configuration management and reduces duplication.
+
+### 3. Database Separation – PostgreSQL and MongoDB
+
+The application uses different databases based on the responsibilities of individual microservices.
+
+- **PostgreSQL:** Used by the User Service for structured relational user information.
+- **MongoDB:** Used by the Activity Service for fitness activity documents and by the AI Service for recommendation-related information.
+
+This follows the Database-per-Service architectural principle.
+
+Each microservice manages its own data instead of directly accessing another service's database.
+
+Benefits include:
+
+- Reduced database coupling.
+- Independent data management.
+- Flexibility in choosing persistence technologies.
+- Independent evolution of service data models.
+
+### 4. Security – Keycloak, OAuth 2.0 and JWT
+
+Instead of implementing authentication and credential management independently inside every microservice, the application delegates identity management to Keycloak.
+
+The frontend uses OAuth 2.0 Authorization Code Flow with PKCE.
+
+The API Gateway acts as a centralized security boundary for protected backend routes.
+
+**Security workflow:**
+
+1. Keycloak authenticates the user.
+2. The frontend obtains an access token.
+3. The frontend attaches the JWT to API requests.
+4. The Gateway validates the token using Keycloak's public signing keys.
+5. Valid requests are routed to the appropriate backend service.
+
+This approach provides centralized authentication and avoids duplicating token-validation logic across the Gateway's downstream routing layer.
+
+### 5. API Gateway instead of exposing individual microservices
+
+Without an API Gateway, the frontend would need to communicate directly with multiple backend services.
+
+This would expose individual service endpoints and make frontend integration more complicated.
+
+The application uses Spring Cloud Gateway as a single entry point.
+
+Responsibilities include:
+
+- Centralized JWT validation.
+- Request routing.
+- Service discovery integration.
+- CORS configuration.
+
+The frontend communicates with the Gateway rather than directly managing connections to every backend microservice.
+
+This also provides a convenient place to introduce additional cross-cutting concerns such as rate limiting and request logging.
+
+### 6. Fault Tolerance and Reliability
+
+The application uses asynchronous messaging to reduce direct dependencies between the Activity Service and AI Service.
+
+If AI processing is temporarily unavailable, activity recording does not need to wait for the AI Service to complete its work.
+
+RabbitMQ acts as an intermediary that can hold messages while consumers are unavailable, provided the queue, messages, and broker persistence are configured appropriately.
+
+The architecture also separates user data, activity data, and recommendation data across different services.
+
+This helps isolate failures and makes individual services easier to maintain.
+
+**Important reliability considerations for future implementation:**
+
+- Durable queues and persistent messages.
+- Manual message acknowledgements.
+- Retry mechanisms for failed processing.
+- Dead-letter queues for messages that cannot be processed.
+- Idempotent consumers to prevent duplicate processing.
+
+### 7. Further Scaling
+
+The microservices architecture allows individual components to scale independently.
+
+For example:
+
+1. **Horizontal Scaling of AI Service:** If recommendation-generation requests increase, multiple AI Service instances can be deployed to consume messages from the same RabbitMQ queue.
+
+2. **RabbitMQ Load Leveling:** During sudden traffic spikes, messages can accumulate in the queue instead of forcing the AI Service to process every request immediately.
+
+3. **Independent Service Scaling:** Activity Service and User Service can be scaled independently depending on their workloads.
+
+4. **Load Balancing:** Eureka and Spring Cloud LoadBalancer can help distribute requests across multiple registered service instances.
+
+5. **Container Orchestration:** Kubernetes can be introduced later to manage container deployment, service discovery, health checks, and scaling.
+
+### 8. Further Improvements
+
+The following improvements can make the platform more reliable and production-ready:
+
+1. Implement retry mechanisms for failed RabbitMQ message processing.
+2. Introduce Dead Letter Exchanges and Dead Letter Queues.
+3. Implement circuit breakers using Resilience4j for inter-service communication.
+4. Add centralized logging using the ELK stack.
+5. Introduce monitoring and metrics using Prometheus and Grafana.
+6. Implement distributed tracing using OpenTelemetry.
+7. Introduce Docker Compose for consistent local development environments.
+8. Implement Kubernetes-based deployment and horizontal scaling.
+9. Introduce caching using Redis for frequently accessed user and activity data.
+10. Implement comprehensive unit and integration testing.
+
+### 9. Why Spring Boot Microservices instead of a Monolithic Backend?
+
+A monolithic backend would combine user management, activity tracking, and AI processing within one application.
+
+Although simpler initially, this can make independent development and scaling difficult as functionality increases.
+
+The microservices approach separates these responsibilities into independently running applications.
+
+For example, AI recommendation processing can be scaled without necessarily scaling the User Service.
+
+This provides better separation of concerns and flexibility as the platform evolves.
 
 ---
+
+## 🏛️ Design Patterns and Architectural Principles
+
+### 1. API Gateway Pattern
+
+The application implements the API Gateway pattern using Spring Cloud Gateway.
+
+Instead of allowing the frontend to communicate with individual microservices directly, requests enter through a centralized Gateway.
+
+```text
+              React Frontend
+                    |
+                    v
+               API Gateway
+                    |
+          ---------------------
+          |         |         |
+          v         v         v
+       User      Activity     AI
+       Service    Service   Service
+```
+
+The Gateway handles request routing and centralized JWT validation.
+
+This simplifies frontend communication and provides a centralized entry point to the backend.
+
+### 2. Database-per-Service Pattern
+
+Each microservice owns its respective data and database interactions.
+
+```text
+       User Service
+            |
+            v
+        PostgreSQL
+
+
+      Activity Service
+            |
+            v
+          MongoDB
+
+
+        AI Service
+            |
+            v
+          MongoDB
+```
+
+This prevents direct database dependencies between services and allows each service to manage its persistence independently.
+
+### 3. Event-Driven Architecture
+
+The Activity Service and AI Service communicate through asynchronous events using RabbitMQ.
+
+Instead of requiring both services to participate in the same synchronous request, the Activity Service publishes an event that the AI Service consumes independently.
+
+This separates activity recording from recommendation processing.
+
+### 4. Service Discovery Pattern
+
+Eureka implements service registration and discovery.
+
+Microservices register themselves with Eureka, allowing other services to discover them using logical service names rather than hardcoded network locations.
+
+This makes communication more flexible when service instances change.
+
+
 
 ##  Future Improvements
 

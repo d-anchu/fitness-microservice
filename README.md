@@ -1,6 +1,6 @@
 #  Fitness Microservices Platform
 
-A full-stack fitness tracking platform built using **Java, Spring Boot, Spring Cloud, and React**, following a distributed microservices architecture.
+A full-stack fitness tracking platform built using **Java, Spring Boot and React**, following a distributed microservices architecture.
 
 The platform separates user management, fitness activity tracking, and AI-powered recommendations into independently running services. It integrates Keycloak for authentication, RabbitMQ for asynchronous event processing, Eureka for service discovery, and Spring Cloud Config for centralized configuration.
 

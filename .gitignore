@@ -43,6 +43,8 @@ package-lock.json
 !**/src/**/*.js
 !fitness-app-frontend/**/*.js
 !fitness-app-frontend/**/*.jsx
+!START-ALL-SERVICES.ps1
+!VERIFY-SYSTEM.ps1
 .agents/
 
 # ---------------------------------------------------------------------------

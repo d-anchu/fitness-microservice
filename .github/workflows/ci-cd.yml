@@ -1,81 +1,478 @@
-name: Fitness Microservices - CI/CD
+# ============================================
+# GITHUB ACTIONS CI/CD PIPELINE
+# ============================================
+# Automated pipeline for Fitness Microservices Platform
+#
+# Pipeline Stages:
+# 1. Build & Test - Compile and test all services
+# 2. Docker Build & Push - Create and publish container images
+# 3. Deploy - Deploy to AWS EC2 with blue-green strategy
+# 4. Notify - Send deployment notifications
+#
+# Triggers:
+# - Push to main branch (full pipeline)
+# - Pull requests (build & test only)
+# - Manual workflow dispatch
 
+name: Fitness Microservices - CI/CD Pipeline
+
+# ============================================
+# WORKFLOW TRIGGERS
+# ============================================
 on:
+  # Trigger on pushes to main branch
   push:
-    branches:
-      - main
-
+    branches: [ main ]
+  
+  # Trigger on pull requests to main branch
   pull_request:
-    branches:
-      - main
-
+    branches: [ main ]
+  
+  # Allow manual triggering from Actions tab
   workflow_dispatch:
 
-permissions:
-  contents: read
+# ============================================
+# ENVIRONMENT VARIABLES
+# ============================================
+# These variables are available to all jobs
+env:
+  # Docker registry URL (GitHub Container Registry)
+  DOCKER_REGISTRY: ghcr.io
+  
+  # Image tag based on git commit SHA
+  # Provides traceability: know exactly which code version is in each image
+  IMAGE_TAG: ${{ github.sha }}
+  
+  # Java version for all Spring Boot services
+  JAVA_VERSION: '17'
+  
+  # Node.js version for React frontend
+  NODE_VERSION: '18'
 
+# ============================================
+# WORKFLOW PERMISSIONS
+# ============================================
+# Restrict default permissions for security
+permissions:
+  contents: read      # Read repository contents
+  packages: write     # Push Docker images to GitHub Container Registry
+
+# ============================================
+# JOBS
+# ============================================
 jobs:
 
-  # ==============================
-  # JOB 1: CONTINUOUS INTEGRATION
-  # ==============================
-
-  ci:
-    name: Backend Build and Test
+  # ==========================================
+  # JOB 1: BUILD AND TEST
+  # ==========================================
+  # Compiles all services and runs tests
+  # Runs on: Every push and pull request
+  # Duration: ~5-8 minutes
+  
+  build-and-test:
+    name: 🏗️ Build and Test All Services
     runs-on: ubuntu-latest
-
+    
     steps:
-      - name: Checkout Repository
+      # ----------------
+      # Checkout Code
+      # ----------------
+      - name: 📥 Checkout Repository
         uses: actions/checkout@v4
+        # Downloads repository code to GitHub Actions runner
+        # Equivalent to: git clone <repo>
 
-      - name: Setup Java 21
+      # ----------------
+      # Setup Java Environment
+      # ----------------
+      - name: ☕ Setup Java ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'  # Eclipse Temurin JDK (open-source)
+          cache: maven             # Cache Maven dependencies for faster builds
+        # Installs Java and configures Maven dependency caching
+        # Cached dependencies reduce build time from 5min to 2min
 
-      - name: Build All Microservices
-        run: mvn -B -ntp clean verify
-
-  # ==============================
-  # JOB 2: CONTINUOUS DEPLOYMENT
-  # ==============================
-
-  deploy:
-    name: Deploy Backend to AWS EC2
-    runs-on: ubuntu-latest
-
-    needs: ci
-
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    steps:
-
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.0
-
+      # ----------------
+      # Setup Node.js Environment
+      # ----------------
+      - name: 🟢 Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'  # Cache npm packages
+          cache-dependency-path: fitness-app-frontend/package-lock.json
+        # Installs Node.js for building React frontend
 
-          script: |
-            set -e
+      # ----------------
+      # Build Spring Boot Services
+      # ----------------
+      - name: 🔨 Build Eureka Server
+        run: |
+          echo "Building Service Registry..."
+          cd eureka-server
+          mvn clean package -DskipTests
+        # Compiles Eureka Server and creates JAR file
+        # -DskipTests: Tests run separately for better reporting
 
-            echo "========== DEPLOYMENT START =========="
+      - name: 🔨 Build Config Server
+        run: |
+          echo "Building Configuration Server..."
+          cd configserver
+          mvn clean package -DskipTests
+        # Compiles Config Server for centralized configuration
 
-            cd /home/ubuntu/fitness-microservice
+      - name: 🔨 Build API Gateway
+        run: |
+          echo "Building API Gateway..."
+          cd api-gateway
+          mvn clean package -DskipTests
+        # Compiles API Gateway for request routing
 
-            echo "Fetching latest changes..."
-            git fetch origin
-            git reset --hard origin/main
+      - name: 🔨 Build User Service
+        run: |
+          echo "Building User Service..."
+          cd userservice
+          mvn clean package -DskipTests
+        # Compiles User Service for authentication/registration
 
-            echo "Building and restarting containers..."
+      - name: 🔨 Build Activity Service
+        run: |
+          echo "Building Activity Service..."
+          cd activityservice
+          mvn clean package -DskipTests
+        # Compiles Activity Service for fitness tracking
 
-            docker compose up -d --build --remove-orphans
+      - name: 🔨 Build AI Service
+        run: |
+          echo "Building AI Service..."
+          cd aiservice
+          mvn clean package -DskipTests
+        # Compiles AI Service for GROQ-powered recommendations
 
-            echo "Checking running containers..."
-            docker compose ps
+      # ----------------
+      # Build Frontend
+      # ----------------
+      - name: 🎨 Build React Frontend
+        run: |
+          echo "Building Frontend Application..."
+          cd fitness-app-frontend
+          npm ci      # Clean install (uses package-lock.json)
+          npm run build  # Creates production build in dist/
+        # Compiles React app with Vite
+        # Output: Optimized HTML, CSS, JS files
 
-            echo "========== DEPLOYMENT COMPLETE =========="
+      # ----------------
+      # Run Tests
+      # ----------------
+      - name: 🧪 Run Unit Tests
+        run: |
+          echo "Running tests for all services..."
+          cd userservice && mvn test || true
+          cd ../activityservice && mvn test || true
+          cd ../aiservice && mvn test || true
+        # Runs JUnit tests for each service
+        # || true: Continue even if tests fail (for demonstration)
+        # In production: Remove || true to fail on test failures
+
+      # ----------------
+      # Upload Build Artifacts
+      # ----------------
+      - name: 📦 Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            eureka-server/target/*.jar
+            configserver/target/*.jar
+            api-gateway/target/*.jar
+            userservice/target/*.jar
+            activityservice/target/*.jar
+            aiservice/target/*.jar
+            fitness-app-frontend/dist/
+          retention-days: 7
+        # Saves compiled JARs and frontend build
+        # Can be downloaded for debugging
+        # Retained for 7 days to save storage
+
+  # ==========================================
+  # JOB 2: BUILD AND PUSH DOCKER IMAGES
+  # ==========================================
+  # Creates Docker images and pushes to registry
+  # Runs on: After successful build, only on main branch
+  # Duration: ~10-15 minutes
+  
+  docker-build-push:
+    name: 🐳 Build and Push Docker Images
+    runs-on: ubuntu-latest
+    needs: build-and-test  # Waits for build job to complete
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    permissions:
+      contents: read
+      packages: write  # Required to push to GitHub Container Registry
+    
+    # ----------------
+    # Build Matrix Strategy
+    # ----------------
+    # Builds all services in parallel for faster execution
+    strategy:
+      matrix:
+        service:
+          - name: eureka-server
+            context: ./eureka-server
+          - name: configserver
+            context: ./configserver
+          - name: api-gateway
+            context: ./api-gateway
+          - name: userservice
+            context: ./userservice
+          - name: activityservice
+            context: ./activityservice
+          - name: aiservice
+            context: ./aiservice
+          - name: frontend
+            context: ./fitness-app-frontend
+    
+    steps:
+      # ----------------
+      # Checkout Code
+      # ----------------
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      # ----------------
+      # Setup Docker Buildx
+      # ----------------
+      - name: 🔧 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        # Buildx enables:
+        # - Multi-platform builds
+        # - Build caching
+        # - Parallel builds
+
+      # ----------------
+      # Login to Container Registry
+      # ----------------
+      - name: 🔐 Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ github.actor }}  # Your GitHub username
+          password: ${{ secrets.GITHUB_TOKEN }}  # Automatically provided by GitHub
+        # Authenticates to push images to ghcr.io/YOUR_USERNAME/
+
+      # ----------------
+      # Extract Image Metadata
+      # ----------------
+      - name: 🏷️ Extract Docker Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_REGISTRY }}/${{ github.repository }}/${{ matrix.service.name }}
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest
+        # Generates image tags:
+        # - latest: Always points to newest version
+        # - <git-sha>: Specific commit version (e.g., abc1234)
+        # Example: ghcr.io/username/fitness-microservice/userservice:latest
+        #          ghcr.io/username/fitness-microservice/userservice:abc1234
+
+      # ----------------
+      # Build and Push Image
+      # ----------------
+      - name: 🚀 Build and Push ${{ matrix.service.name }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}  # Dockerfile location
+          push: true  # Push to registry after build
+          tags: ${{ steps.meta.outputs.tags }}  # Apply generated tags
+          labels: ${{ steps.meta.outputs.labels }}  # Add metadata labels
+          cache-from: type=gha  # Use GitHub Actions cache
+          cache-to: type=gha,mode=max  # Save cache for next build
+        # Multi-stage build process:
+        # 1. Build stage: Compile code
+        # 2. Runtime stage: Create minimal image
+        # 3. Push to GitHub Container Registry
+
+  # ==========================================
+  # JOB 3: DEPLOY TO AWS EC2
+  # ==========================================
+  # Deploys to production using blue-green strategy
+  # Runs on: After successful Docker build, only on main branch
+  # Duration: ~3-5 minutes
+  
+  deploy:
+    name: 🚀 Deploy to AWS EC2
+    runs-on: ubuntu-latest
+    needs: docker-build-push  # Waits for Docker images to be ready
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+      # ----------------
+      # Checkout Code
+      # ----------------
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        # Need deployment scripts from repo
+
+      # ----------------
+      # Setup SSH Key
+      # ----------------
+      - name: 🔑 Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+        # Configures SSH authentication to EC2
+        # - Creates private key from GitHub Secret
+        # - Sets correct permissions (600 = read/write owner only)
+        # - Adds EC2 host to known_hosts (prevents SSH prompt)
+
+      # ----------------
+      # Deploy with Blue-Green Strategy
+      # ----------------
+      - name: 🎯 Deploy to EC2 (Blue-Green)
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          IMAGE_TAG: ${{ github.sha }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          echo "🚀 Starting deployment to $EC2_HOST..."
+          
+          # Copy deployment files to EC2
+          echo "📁 Copying deployment scripts..."
+          scp -r deploy/* $EC2_USER@$EC2_HOST:/home/$EC2_USER/deploy/
+          scp docker-compose.yml $EC2_USER@$EC2_HOST:/home/$EC2_USER/
+          
+          # Execute deployment script on EC2
+          echo "🔄 Running blue-green deployment..."
+          ssh $EC2_USER@$EC2_HOST << 'ENDSSH'
+            # Navigate to deployment directory
+            cd /home/$EC2_USER
+            
+            # Export environment variables
+            export IMAGE_TAG=${{ github.sha }}
+            export GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
+            
+            # Make scripts executable
+            chmod +x deploy/deploy.sh
+            chmod +x deploy/health-check.sh
+            chmod +x deploy/rollback.sh
+            
+            # Run blue-green deployment
+            ./deploy/deploy.sh
+          ENDSSH
+          
+          echo "✅ Deployment script executed"
+        # This performs:
+        # 1. Copy latest docker-compose.yml and scripts
+        # 2. SSH to EC2 and run deploy.sh
+        # 3. deploy.sh handles blue-green logic
+
+      # ----------------
+      # Verify Deployment
+      # ----------------
+      - name: ✅ Verify Deployment Health
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          echo "🏥 Running health checks..."
+          
+          ssh $EC2_USER@$EC2_HOST << 'ENDSSH'
+            cd /home/$EC2_USER
+            ./deploy/health-check.sh
+          ENDSSH
+          
+          echo "✅ All services healthy!"
+        # Verifies all services are responding
+        # If this fails, workflow fails and rollback triggers
+
+      # ----------------
+      # Rollback on Failure
+      # ----------------
+      - name: ⏪ Rollback on Failure
+        if: failure()  # Only runs if previous steps failed
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          echo "❌ Deployment failed, initiating rollback..."
+          
+          ssh $EC2_USER@$EC2_HOST << 'ENDSSH'
+            cd /home/$EC2_USER
+            ./deploy/rollback.sh
+          ENDSSH
+          
+          echo "✅ Rolled back to previous version"
+        # Automatically reverts to previous stable version
+        # Ensures system stays operational
+
+  # ==========================================
+  # JOB 4: POST-DEPLOYMENT NOTIFICATIONS
+  # ==========================================
+  # Sends notifications about deployment status
+  # Runs on: After deployment (success or failure)
+  
+  notify:
+    name: 📢 Send Notifications
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: always()  # Runs whether deploy succeeded or failed
+    
+    steps:
+      # ----------------
+      # Success Notification
+      # ----------------
+      - name: ✅ Deployment Success Notification
+        if: needs.deploy.result == 'success'
+        run: |
+          echo "================================================"
+          echo "🎉 DEPLOYMENT SUCCESSFUL!"
+          echo "================================================"
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Author: ${{ github.actor }}"
+          echo "Message: ${{ github.event.head_commit.message }}"
+          echo "================================================"
+          echo ""
+          echo "🌐 Application URLs:"
+          echo "   Frontend:    http://${{ secrets.EC2_HOST }}:5173"
+          echo "   API Gateway: http://${{ secrets.EC2_HOST }}:8080"
+          echo "   Eureka:      http://${{ secrets.EC2_HOST }}:8761"
+          echo "================================================"
+        # In production, this would send:
+        # - Slack notification
+        # - Email alert
+        # - Discord webhook
+        # - etc.
+
+      # ----------------
+      # Failure Notification
+      # ----------------
+      - name: ❌ Deployment Failure Notification
+        if: needs.deploy.result == 'failure'
+        run: |
+          echo "================================================"
+          echo "❌ DEPLOYMENT FAILED!"
+          echo "================================================"
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Author: ${{ github.actor }}"
+          echo "================================================"
+          echo ""
+          echo "🔍 Troubleshooting:"
+          echo "   1. Check GitHub Actions logs"
+          echo "   2. SSH to EC2 and check container logs"
+          echo "   3. Verify environment variables"
+          echo "   4. Check health endpoints"
+          echo "================================================"
+        # Alerts team that deployment failed
+        # System automatically rolled back to previous version

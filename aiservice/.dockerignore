@@ -1,0 +1,37 @@
+# ============================================
+# DOCKERIGNORE FOR SPRING BOOT SERVICES
+# ============================================
+# Excludes files from Docker build context
+# Reduces build time and image size
+
+# Maven build output (will be rebuilt in Docker)
+target/
+!target/*.jar
+
+# IDE files (not needed in container)
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Git files (not needed in container)
+.git/
+.gitignore
+.gitattributes
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test files
+src/test/
+
+# Documentation
+README.md
+HELP.md
+*.md
